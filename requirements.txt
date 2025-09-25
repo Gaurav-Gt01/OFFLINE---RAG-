@@ -1,0 +1,7 @@
+streamlit
+PyMuPDF
+python-docx
+pytesseract
+pillow
+chromadb
+ollama
