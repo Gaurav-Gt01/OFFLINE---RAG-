@@ -1,7 +1,7 @@
 import streamlit as st
 from document_processor import process_pdf, process_docx, process_image, split_text
-from vector_store import get_or_create_collection, upsert_documents, query_collection
-from llm_handler import call_llm
+from vector_store import get_or_create_collection, upsert_documents
+from llm_handler import answer_question
 
 
 st.set_page_config(
@@ -21,15 +21,16 @@ st.markdown(
 )
 
 
-if 'collection' not in st.session_state:
+# ----------------- Initialize State -----------------
+if "collection" not in st.session_state:
     st.session_state.collection = get_or_create_collection("documents")
-if 'messages' not in st.session_state:
+if "messages" not in st.session_state:
     st.session_state.messages = []
 
 
+# ----------------- Upload Section -----------------
 st.subheader("📂 Upload Documents")
 col1, col2, col3 = st.columns(3)
-
 
 with col1:
     pdf_file = st.file_uploader("Upload PDF", type=["pdf"])
@@ -37,7 +38,6 @@ with col2:
     docx_file = st.file_uploader("Upload DOCX", type=["docx"])
 with col3:
     image_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"])
-
 
 if st.button("⚡ Process Documents"):
     text_data = ""
@@ -60,30 +60,39 @@ if st.button("⚡ Process Documents"):
     if text_data:
         chunks = split_text(text_data)
         upsert_documents(st.session_state.collection, chunks)
-        st.success("Document(s) processed and added to the knowledge base.")
+        st.success("✅ Document(s) processed and added to the knowledge base.")
     else:
-        st.warning("Please upload a file to process.")
+        st.warning("⚠️ Please upload a file to process.")
+
 
 # ----------------- Chat Section -----------------
 st.subheader("💬 Ask a Question")
 
-# Display chat messages from history
+# Show history
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Chat input (Enter sends message)
+# ----------------- Chat Section -----------------
+st.subheader("💬 Ask a Question")
+
+# Show history
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# Chat input
 user_input = st.chat_input("Type your question and press Enter...")
 if user_input:
     # Add user message
     st.session_state.messages.append({"role": "user", "content": user_input})
 
-    # Retrieve relevant documents
-    relevant_docs = query_collection(st.session_state.collection, user_input)
-    context = " ".join(relevant_docs) if relevant_docs else ""
-
-    # Get LLM response
-    answer = call_llm(context, user_input)
+    # Get full RAG pipeline answer
+    answer = answer_question(st.session_state.collection, user_input)
 
     # Add assistant message
     st.session_state.messages.append({"role": "assistant", "content": answer})
+
+    # Display assistant reply in chat bubble
+    with st.chat_message("assistant"):
+        st.markdown(f"### 🧾 Answer\n{answer}")
